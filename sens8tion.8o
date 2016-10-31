@@ -65,16 +65,18 @@
 :alias TextKing_X_Override va
 :alias TextKing_Y_Override vb
 
+:alias fightLoopValue v8
 
 :const intro_text_x 0x1
 :const intro_upper_text_y 0x11
 :const intro_lower_text_y 0x2a
 
-:const intro_timer 16
+
 :const buzzer_gun_flash 5
 
 :const BarBottomFill 0x3e
-:const step_bar_capacity 16
+:const intro_timer 32
+:const step_bar_capacity 32
 
 :const boxX_long_minus_2 0x20
 :const boxX_long_middle 0x38
@@ -84,9 +86,15 @@
 :const boxY_long_middle 0x18
 :const boxY_long_plus_2 0x30
 
+:const some18s 0x05d
+
+#:org 0x1b0
+#: enemyData
+# 0 0 0 0 0 0 0 0
+# 0 0 0 0 0 0 0 0
 
 #:org 0x1C0
-#: enemyProgressNumbers
+#: someotherstuff
 # 0 0 0 0 0 0 0 0
 # 0 0 0 0 0 0 0 0
 
@@ -101,12 +109,15 @@
 	# We know for sure that registers are allocated as 0, but, we do not know that our memory is allocated as 0 unless
 	# it is allocated in the rom.
 	# As a result, we 0 out data we may read from in advance:
-	i := 0x1c0
-	save vf
+
+	fightLoopValue := 0xfe
+	:breakpoint testrewrite
+	writeGameValues
 
 : restartGame
 	lores
 
+	fightLoopValue := 0xff
 	turn_off_dance
 
 	:unpack 0xA title_text
@@ -122,6 +133,8 @@
 
 	hires
 	clear
+
+	jump gameTestJump
 
 	# Initialise new paragraph location for introduction:
 	v0 := 0
@@ -141,8 +154,8 @@
 	save v1
 
 	# Restore text introduction start point:
-	:unpack 0xA intro_text
-	#:unpack 0xA intro_text_skip
+	#:unpack 0xA intro_text
+	:unpack 0xA intro_text_skip
 	i := textReadAddress
 	save v1
 
@@ -165,12 +178,13 @@
 
 	# Draw corpses everywhere:
 
+	fightLoopValue := 0
 	killbox := 0
 	killbox_character := 0x60 # Address corpse
 	loop
 		draw_antagonist
-		killbox += 1
-		if killbox != 8 then
+		killbox += 4
+		if killbox != 0x20 then
 	again
 
 	# Address lightly and make the text dance:
@@ -240,43 +254,147 @@
 	:unpack 0xA text_killthem
 	danceTextLoop
 
+	: gameTestJump
 	clear
 	i := stepEndInsert
-	:unpack 0x1 realGameLoop
+	:unpack 0x1 realGameEndRoundLoop
 	save v1
 
+	# We need to like make a game lol
+	# Set progress values:
+	writeGameValues
+
 	# Draw cops:
+
+	:breakpoint testGame
 
 	killbox := 0
 	killbox_character := 0x20 # Address trooper
 	loop
-		draw_antagonist
-		killbox += 1
-		if killbox != 8 then
+
+		fightLoopValue := 0
+		fightLoop
+		fightLoopValue := 4
+		fightLoop
+		fightLoopValue := 5
+		fightLoop
+
+		killbox += 4
+		if killbox != 0x20 then
 	again
 
+	fightLoopValue := 1
+	killbox := 0
 	game_loop
 
 	jump restartGame
 
+	jump stepEndInsertReturn
+
+: realGameEndRoundLoop
+
+	jump stepEndInsertReturn
+
+: allboxes_fightloop
+	if fightLoopValue == 0xff then return
+
+	killbox += 4
+	if killbox == 0x20 then killbox := 0
+	fightLoop
+;
+
+: fightLoop
+	if fightLoopValue == 0xff then return
+	if fightLoopValue == 0 then draw_antagonist
+
+	# Let's get their progress and health:
+	i := 0x1b0
+	i += killbox
+	load v3
+
+	# if the loop value is 5, we draw a full health bar:
+	if fightLoopValue == 5 begin
+		i := anFF
+		v2 += 4
+		sprite v2 v3 1
+		end
+
+	# For 4 we are drawing their progress bar from scratch
+	if fightLoopValue == 4 begin
+		i := some18s
+		v2 += -4
+		v3 += 15
+
+		if v0 == 0 then jump skipProgressDraw
+		loop
+			sprite v2 v3 1
+			v3 += -1
+			v0 += -1
+		if v0 != 0 then again
+
+		end
+
+	# if we are value 1 we are adding a small amount to their ready value
+	if fightLoopValue == 1 begin
+		# we'll need their ready value
+		v4 := random 0x03
+		if v4 != 0 then jump skipProgressDraw
+		v0 += 1
+		save v1
+		v2 += -4
+		v3 += 16
+		v3 -= v0
+		i := some18s
+		sprite v2 v3 1
+
+		end
+
+	: skipProgressDraw
 
 
+;
 
+: writeGameValues
+	v4 := 4
+	i := 0x1b0
+	vf := 0
+	loop
+		# v1 is operation select:
+		if fightLoopValue == 0xfe begin
+			i := get_killbox
+			i += vf
+			load v1
+			v2 := v0
+			v3 := v1
+			i := 0x1b0
+			i += vf
+			i += vf
+			else
+			load v3
+			end
 
-
-
+		v0 := random 0x07
+		v1 := 32
+		save v3
+		i += v4
+		vf += 2
+		if vf != 16 then
+	again
+;
 
 : cutsceneWait5
+	# Write text based on v0 / v1 values being the address
 	textKing_fullPackage
 	loop
 	test_input
 	if v1 != 0x5 then again
+	# Remove text
 	textKing_useSavedParagraph
 ;
 
 : game_loop
-	# Draw the display bars:
 	draw_bars
+: game_loop_skip_bars
 	# Set initial player position:
 	playerX := 0x38
 	playerY := 0x18
@@ -284,16 +402,20 @@
 	# Create a preston:
 	address_preston
 	sprite playerX playerY 0
-
+: game_loop_skip_preston
+	# Draw the display bars:
 	StepTimer := intro_timer
 	fill_step_display
 	loop
-		vf := 8
+		vf := 4
 		delay := vf
 
 		decrease_step_display
 
 		input_loop
+
+		: stepLoopInsert
+		allboxes_fightloop
 
 		if StepTimer == 0 begin
 			StepTimer := buzzer_gun_flash
@@ -395,12 +517,6 @@
 	draw_antagonist_tutorial
 
 	jump stepEndInsertReturn
-
-
-: realGameLoop
-
-	jump stepEndInsertReturn
-
 
 : input_loop
 
@@ -617,19 +733,22 @@
 	if v1 == 5 then return
 	killbox_character := 0x80 # hit handgun man
 	killbox := v0
+	killbox <<= killbox
+	killbox <<= killbox
 : draw_antagonist
 	# normal antagonist draw routine, v0 selects which zone they are located in
 
-	i := get_killbox
-	ve := killbox 
-	ve <<= ve
-	i += ve
-	load v1
+	i := 0x1b0
+	i += killbox
+	load v3
+
+	# If the bit we shifted off of ve was 1 then we return here:
+	if fightLoopValue != 0 then return
 
 	i := antagonist_sprite_data
 	i += killbox_character
 	
-	sprite v0 v1 0
+	sprite v2 v3 0
 ;
 
 : inputzones
@@ -953,7 +1072,9 @@
 
 : title_text
 	0x2C 0x31 0x0C 0x2C 0x46 0x39 0x35 0x6F
-	0x0C 0xFF
+	0x0C 
+	: anFF 
+	0xFF
 
 : intro_text # (419 bytes)
 	0xff
@@ -1175,7 +1296,10 @@
 	0xF0 0x80 0x80 0x88 0x50 0x20 0x50 0x88
 	0xF8 0x88 0x78 0x88 0xF8 0x08 0x08 0x10
 	0x10 0x30 0x50 0x90 0xF8 0x10 0x20 0x40
-	0xF8 0x80 0xF0 0x80 0x80 0x80 0x80 0xF8
+	0xF8 0x80 0xF0 
+	: four80s
+	0x80 0x80 0x80 0x80
+	0xF8
 
 # Jump tables out in the butt of the program because of broken jump0, we stick them here so we can just use vf
 # TURNS OUT: way more efficient to not use jump tables
