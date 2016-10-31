@@ -141,8 +141,8 @@
 	save v1
 
 	# Restore text introduction start point:
-	#:unpack 0xA intro_text
-	:unpack 0xA intro_text_skip
+	:unpack 0xA intro_text
+	#:unpack 0xA intro_text_skip
 	i := textReadAddress
 	save v1
 
@@ -165,13 +165,12 @@
 
 	# Draw corpses everywhere:
 
-	v2 := 0
-	v1 := 0x60 # Address corpse
+	killbox := 0
+	killbox_character := 0x60 # Address corpse
 	loop
-		v0 := v2
 		draw_antagonist
-		v2 += 1
-		if v2 != 8 then
+		killbox += 1
+		if killbox != 8 then
 	again
 
 	# Address lightly and make the text dance:
@@ -248,13 +247,12 @@
 
 	# Draw cops:
 
-	v2 := 0
-	v1 := 0x20 # Address corpse
+	killbox := 0
+	killbox_character := 0x20 # Address trooper
 	loop
-		v0 := v2
 		draw_antagonist
-		v2 += 1
-		if v2 != 8 then
+		killbox += 1
+		if killbox != 8 then
 	again
 
 	game_loop
@@ -461,11 +459,11 @@
 	v2 += -1
 
 	# Now that we have that smaller value calulated, let's calculate the larger value:
-	# Multiply up v0
-	v0 <<= v0
-	v0 <<= v0
-	vf := v0
-	jump0 group_select_a
+	i := group_select_a
+	i += v0
+	load v0
+
+	v3 := v0
 	
 	: group_select_a_end
 
@@ -618,19 +616,20 @@
 	# We want to position the target wherever they were aiming for this, so we must have preloaded v0 and in this case, v1 with valid data
 	if v1 == 5 then return
 	killbox_character := 0x80 # hit handgun man
+	killbox := v0
 : draw_antagonist
 	# normal antagonist draw routine, v0 selects which zone they are located in
-	killbox <<= killbox
-	killbox <<= killbox
-	vf := v0
 
-	get_killbox_x
-	get_killbox_y
+	i := get_killbox
+	ve := killbox 
+	ve <<= ve
+	i += ve
+	load v1
 
 	i := antagonist_sprite_data
 	i += killbox_character
 	
-	sprite killbox_X killbox_Y 0
+	sprite v0 v1 0
 ;
 
 : inputzones
@@ -1179,42 +1178,48 @@
 	0xF8 0x80 0xF0 0x80 0x80 0x80 0x80 0xF8
 
 # Jump tables out in the butt of the program because of broken jump0, we stick them here so we can just use vf
+# TURNS OUT: way more efficient to not use jump tables
 #:org 0xF9F
 	# The value in v1 will be how many frames we must advance, * 8, which if we apply 4 times
 	# will correctly step us forward
-	:breakpoint b
 	: group_select_a
-	v3 := 0 	jump group_select_a_end
-	v3 := 56 	jump group_select_a_end
-	v3 := 104 	jump group_select_a_end
+	0
+	56
+	104
 
-	v3 := 144 	jump group_select_a_end
-	v3 := 176 	jump group_select_a_end
-	v3 := 200 	jump group_select_a_end
+	144
+	176
+	200
 
-	v3 := 216 	jump group_select_a_end
+	216
 
-#:org 0xFBB
-: get_killbox_x
-	jump0 killbox_x_table
-	: killbox_x_table
-	killbox_X := boxX_long_minus_2 ;
-	killbox_X := boxX_long_middle ;
-	killbox_X := boxX_long_plus_2 ;
-	killbox_X := boxX_long_minus_2 ;
-	killbox_X := boxX_long_plus_2 ;
-	killbox_X := boxX_long_minus_2 ;
-	killbox_X := boxX_long_middle ;
-	killbox_X := boxX_long_plus_2 ;
+: get_killbox
+	# I just remembered this doesn't work:
+	#boxX_long_minus_2
+	#boxY_long_minus_2
+	#boxX_long_middle
+	#boxY_long_minus_2
+	#boxX_long_plus_2
+	#boxY_long_minus_2
+	#boxX_long_minus_2
+	#boxY_long_middle
+	#boxX_long_plus_2
+	#boxY_long_middle
+	#boxX_long_minus_2
+	#boxY_long_plus_2
+	#boxX_long_middle
+	#boxY_long_plus_2
+	#boxX_long_plus_2
+	#boxY_long_plus_2
 
-: get_killbox_y
-	jump0 killbox_y_table
-	: killbox_y_table
-	killbox_Y := boxY_long_minus_2 ;
-	killbox_Y := boxY_long_minus_2 ;
-	killbox_Y := boxY_long_minus_2 ;
-	killbox_Y := boxY_long_middle ;
-	killbox_Y := boxY_long_middle ;
-	killbox_Y := boxY_long_plus_2 ;
-	killbox_Y := boxY_long_plus_2 ;
-	killbox_Y := boxY_long_plus_2 ;
+	0x20	0
+	0x38	0
+	0x50	0
+
+	0x20	0x18
+	#0x38	0x18 # unused
+	0x50	0x18
+
+	0x20	0x30
+	0x38	0x30
+	0x50	0x30
