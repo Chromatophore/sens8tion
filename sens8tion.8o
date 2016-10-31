@@ -54,6 +54,10 @@
 :alias TextDancerY vb
 
 :alias killbox v9
+:alias killbox_X va
+:alias killbox_Y vb
+:alias killbox_character vc
+
 
 :alias TextKing_X v1
 :alias TextKing_Y v2
@@ -80,6 +84,12 @@
 :const boxY_long_middle 0x18
 :const boxY_long_plus_2 0x30
 
+
+#:org 0x1C0
+#: enemyProgressNumbers
+# 0 0 0 0 0 0 0 0
+# 0 0 0 0 0 0 0 0
+
 #:org 0x1F0
 #: textStartParagraphPositions
 #	0 0 0
@@ -88,6 +98,13 @@
 
 #:org 0x200
 : main
+	# We know for sure that registers are allocated as 0, but, we do not know that our memory is allocated as 0 unless
+	# it is allocated in the rom.
+	# As a result, we 0 out data we may read from in advance:
+	i := 0x1c0
+	save vf
+
+: restartGame
 	lores
 
 	turn_off_dance
@@ -125,7 +142,7 @@
 
 	# Restore text introduction start point:
 	#:unpack 0xA intro_text
-	:unpack 0xA intro_text
+	:unpack 0xA intro_text_skip
 	i := textReadAddress
 	save v1
 
@@ -202,7 +219,12 @@
 	#:breakpoint A
 	:unpack 0xA text_copswant
 	textKing_fullPackage
-	#:breakpoint B
+
+	# Because we just finished a string, at this point, v0 will be 0xFF
+	# restore the 'kill all' text to kill all
+	i := text_killthemall_mod
+	save v0
+
 	vf := 0xf1
 	TextKing_X_Override := 0x55
 	TextKing_Y_Override := intro_upper_text_y
@@ -219,8 +241,25 @@
 	:unpack 0xA text_killthem
 	danceTextLoop
 
+	clear
+	i := stepEndInsert
+	:unpack 0x1 realGameLoop
+	save v1
 
-	jump main
+	# Draw cops:
+
+	v2 := 0
+	v1 := 0x20 # Address corpse
+	loop
+		v0 := v2
+		draw_antagonist
+		v2 += 1
+		if v2 != 8 then
+	again
+
+	game_loop
+
+	jump restartGame
 
 
 
@@ -251,8 +290,7 @@
 	StepTimer := intro_timer
 	fill_step_display
 	loop
-		# 30 fps?
-		vf := 6
+		vf := 8
 		delay := vf
 
 		decrease_step_display
@@ -295,6 +333,7 @@
 		v1 := TextDancerX
 		v2 := TextDancerY
 
+		# Doing both directions is quite expensive but a nicer effect:
 		if v4 == 0 then TextDancerX += 1
 		if v4 == 1 then TextDancerY += 1
 		if v4 == 2 then TextDancerX += -1
@@ -341,7 +380,9 @@
 	load v1
 	v1 += vf
 	v0 += vf
-	i := textReadAddress
+	# We don't need this if using the Superchip save/load I quirk
+	# but we do use jump tables. Shit.
+	#i := textReadAddress
 	save v1
 
 	if v3 == 1 then jump introTextRedrawLoop
@@ -354,6 +395,11 @@
 	i := lastinput_less_2
 	load v1
 	draw_antagonist_tutorial
+
+	jump stepEndInsertReturn
+
+
+: realGameLoop
 
 	jump stepEndInsertReturn
 
@@ -418,22 +464,9 @@
 	# Multiply up v0
 	v0 <<= v0
 	v0 <<= v0
-
+	vf := v0
 	jump0 group_select_a
 	
-	# The value in v1 will be how many frames we must advance, * 8, which if we apply 4 times
-	# will correctly step us forward
-	: group_select_a
-	v3 := 0 	jump group_select_a_end
-	v3 := 56 	jump group_select_a_end
-	v3 := 104 	jump group_select_a_end
-
-	v3 := 144 	jump group_select_a_end
-	v3 := 176 	jump group_select_a_end
-	v3 := 200 	jump group_select_a_end
-
-	v3 := 216 	jump group_select_a_end
-
 	: group_select_a_end
 
 	playerX := 0x38
@@ -455,11 +488,11 @@
 	v0 := 2   if v0 key then v1 := v0
 	v0 := 3   if v0 key then v1 := v0
 	v0 := 4   if v0 key then v1 := v0
-	v0 := 5   if v0 key then v1 := v0
 	v0 := 6   if v0 key then v1 := v0
 	v0 := 7   if v0 key then v1 := v0
 	v0 := 8   if v0 key then v1 := v0
 	v0 := 9   if v0 key then v1 := v0
+	v0 := 5   if v0 key then v1 := v0
 ;
 
 # Draw the idle figure:
@@ -584,44 +617,21 @@
 	# input region (1 2 3  4 5 6  7 8 9)
 	# We want to position the target wherever they were aiming for this, so we must have preloaded v0 and in this case, v1 with valid data
 	if v1 == 5 then return
-	v1 := 0x80 # hit handgun man
+	killbox_character := 0x80 # hit handgun man
 : draw_antagonist
 	# normal antagonist draw routine, v0 selects which zone they are located in
-	v0 <<= v0
-	v0 <<= v0
+	killbox <<= killbox
+	killbox <<= killbox
+	vf := v0
+
 	get_killbox_x
 	get_killbox_y
 
 	i := antagonist_sprite_data
-	i += v1
+	i += killbox_character
 	
-	sprite playerX playerY 0
-
+	sprite killbox_X killbox_Y 0
 ;
-
-: get_killbox_x
-	jump0 killbox_x_table
-	: killbox_x_table
-	playerX := boxX_long_minus_2 ;
-	playerX := boxX_long_middle ;
-	playerX := boxX_long_plus_2 ;
-	playerX := boxX_long_minus_2 ;
-	playerX := boxX_long_plus_2 ;
-	playerX := boxX_long_minus_2 ;
-	playerX := boxX_long_middle ;
-	playerX := boxX_long_plus_2 ;
-
-: get_killbox_y
-	jump0 killbox_y_table
-	: killbox_y_table
-	playerY := boxY_long_minus_2 ;
-	playerY := boxY_long_minus_2 ;
-	playerY := boxY_long_minus_2 ;
-	playerY := boxY_long_middle ;
-	playerY := boxY_long_middle ;
-	playerY := boxY_long_plus_2 ;
-	playerY := boxY_long_plus_2 ;
-	playerY := boxY_long_plus_2 ;
 
 : inputzones
 	0x00 0x05
@@ -1167,3 +1177,44 @@
 	0xF8 0x88 0x78 0x88 0xF8 0x08 0x08 0x10
 	0x10 0x30 0x50 0x90 0xF8 0x10 0x20 0x40
 	0xF8 0x80 0xF0 0x80 0x80 0x80 0x80 0xF8
+
+# Jump tables out in the butt of the program because of broken jump0, we stick them here so we can just use vf
+#:org 0xF9F
+	# The value in v1 will be how many frames we must advance, * 8, which if we apply 4 times
+	# will correctly step us forward
+	:breakpoint b
+	: group_select_a
+	v3 := 0 	jump group_select_a_end
+	v3 := 56 	jump group_select_a_end
+	v3 := 104 	jump group_select_a_end
+
+	v3 := 144 	jump group_select_a_end
+	v3 := 176 	jump group_select_a_end
+	v3 := 200 	jump group_select_a_end
+
+	v3 := 216 	jump group_select_a_end
+
+#:org 0xFBB
+: get_killbox_x
+	jump0 killbox_x_table
+	: killbox_x_table
+	killbox_X := boxX_long_minus_2 ;
+	killbox_X := boxX_long_middle ;
+	killbox_X := boxX_long_plus_2 ;
+	killbox_X := boxX_long_minus_2 ;
+	killbox_X := boxX_long_plus_2 ;
+	killbox_X := boxX_long_minus_2 ;
+	killbox_X := boxX_long_middle ;
+	killbox_X := boxX_long_plus_2 ;
+
+: get_killbox_y
+	jump0 killbox_y_table
+	: killbox_y_table
+	killbox_Y := boxY_long_minus_2 ;
+	killbox_Y := boxY_long_minus_2 ;
+	killbox_Y := boxY_long_minus_2 ;
+	killbox_Y := boxY_long_middle ;
+	killbox_Y := boxY_long_middle ;
+	killbox_Y := boxY_long_plus_2 ;
+	killbox_Y := boxY_long_plus_2 ;
+	killbox_Y := boxY_long_plus_2 ;
