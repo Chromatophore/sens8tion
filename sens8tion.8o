@@ -6,6 +6,12 @@
 ######################
 
 
+# Colours:
+#bad9b6
+#1a3279
+#fff6d6
+#000000
+
 # When the player pushes a key, in a circle:
 # 1 2 3
 # 4 5 6
@@ -66,6 +72,8 @@
 :alias TextKing_Y_Override vb
 
 :alias fightLoopValue v8
+:alias cleanupcalculator v7
+:alias suckvalue v6
 
 :const intro_text_x 0x1
 :const intro_upper_text_y 0x11
@@ -75,8 +83,8 @@
 :const buzzer_gun_flash 5
 
 :const BarBottomFill 0x3e
-:const intro_timer 32
-:const step_bar_capacity 32
+:const intro_timer 16
+:const step_bar_capacity 16
 
 :const boxX_long_minus_2 0x20
 :const boxX_long_middle 0x38
@@ -270,14 +278,8 @@
 	killbox := 0
 	killbox_character := 0x20 # Address trooper
 	loop
-
 		fightLoopValue := 0
 		fightLoop
-		fightLoopValue := 4
-		fightLoop
-		fightLoopValue := 5
-		fightLoop
-
 		killbox += 4
 		if killbox != 0x20 then
 	again
@@ -292,16 +294,20 @@
 
 : realGameEndRoundLoop
 
-	# At the end of the round, we check if our targets have high readiness:
+	# We will iterate over all targets, count any we should have shot that we should have shot
+	killbox := 0
+	# 6 is: Score stuff
+	loop
+		fightLoopValue := 6
+		fightLoop
 
-	fightLoopValue := 3
-	i := inputzones
-	shootEnemy
-	# We need to damage the people we're shooting at
-	i := lastinput_less_2
-	shootEnemy
-	
-	fightLoopValue := 1
+		killbox_character := 0x20
+		fightLoopValue := 0
+		fightLoop
+
+		killbox += 0x4
+		if killbox != 0x20 then
+	again
 
 	jump stepEndInsertReturn
 
@@ -311,23 +317,20 @@
 	if vf == 0x55 begin
 		fightLoopValue := 2
 		i := inputzones
-
-		shootEnemy
-		# We need to damage the people we're shooting at
-		i := lastinput_less_2
-
 		shootEnemy
 		
 		fightLoopValue := 1
 		end
+;
 
-	if fightLoopValue == 0xff then return
+	# we no longer run any service on enemies
+	#if fightLoopValue == 0xff then return
 
 	# Cycle over one enemy at a time to process them:
-	killbox += 4
-	if killbox == 0x20 then killbox := 0
-	fightLoop
-;
+	#killbox += 4
+	#if killbox == 0x20 then killbox := 0
+	#fightLoop
+#;
 
 : shootEnemy
 	load v1
@@ -340,7 +343,6 @@
 
 : fightLoop
 	if fightLoopValue == 0xff then return
-	if fightLoopValue == 0 then draw_antagonist
 
 	# Let's get their progress and health:
 	i := enemyDataArea
@@ -348,107 +350,65 @@
 : fightLoop_PreAddressed
 	load v3
 
-	# if the loop value is 5, we draw a full health bar:
-	if fightLoopValue == 5 begin
-		i := anFF
-		v2 += 4
-		sprite v2 v3 1
-		end
-
-	# For 4 we are drawing their progress bar from scratch
-	if fightLoopValue == 4 begin
-		i := some18s
-		v2 += -4
-		v3 += 15
-
-		if v0 == 0 then jump skipProgressDraw
-		loop
-			sprite v2 v3 1
-			v3 += -1
-			v0 += -1
-		if v0 != 0 then again
-
-		end
-
-	if fightLoopValue == 2 begin
-		# We are hitting the enemy and reducing their shoot bar
-		# We need to redraw the most recent position:
-	
-		v0 += -1
-		if v0 == 0xff then v0 := 0
-		v1 += -1
-		if v1 == 0xff then v1 := 0
+	if fightLoopValue == 6 begin
+		if v1 == 0 then return
+		cleanupcalculator := v1
+		v1 := 0
 		save v1
+		# Remove the character
+		killbox_character := cleanupcalculator
+		draw_antagonist_data_prefilled
 
-		v0 += 1
-		ve := v3
-		updateProgress
-
-		#:breakpoint health
-		v3 := ve
-		v2 += 4
-		updateHealth
-
-		end
-
-	if fightLoopValue == 3 begin
-		v1 += -4
-		save v1
-		if v0 < 12 begin
-			v1 += 4
-			forceHealthUpdate
-			jump skipProgressDraw
+		# If it was a hit enemiy, draw a corpse somewhere
+		if cleanupcalculator > 0x60 begin
+			killbox_character := 0x60
+			v2 := random 0x3F
+			v2 += -39
+			v3 := random 0x1F
+			draw_antagonist_data_prefilled
 			end
-		v0 := 0
-		v1 += -1
-		save v1
-		# we need to update the health too
-		forceHealthUpdate
-		v2 += -1
-		sprite v2 v3 1
+		
+		if cleanupcalculator < 0x60 then add_suck
 
 		end
 
-	# if we are value 1 we are adding a small amount to their ready value
-	if fightLoopValue == 1 begin
-		# we'll need their ready value
-		v4 := random 0x01
-		if v4 != 0 then jump skipProgressDraw
-		v0 += 2
+
+
+	# This is creating an enemy:
+	if fightLoopValue == 0 begin
+		if v1 != 0 then return
+		vf := random 0x01
+		if vf == 0 then v1 := killbox_character
+		if v1 == 0 then return
 		save v1
-		updateProgress
-		v3 += 1
-		updateProgessDoubleGain
-
-		# Detect if it's full and do something?
-
+ 		draw_antagonist_data_prefilled
 		end
 
+	# This is shooting an enemy
+	if fightLoopValue == 2 begin
+		# If is not shootable character:
+		if v1 == 0 then return
+		if v1 > 0x40 then return
+		killbox_character := v1
+		v1 += 0x80
+		save v1
+		draw_antagonist_data_prefilled
+		killbox_character := v1
+		draw_antagonist_data_prefilled
+
+		end
 	: skipProgressDraw
 ;
 
-: updateProgress
-	v2 += -4
-	v3 += 16
-	v3 -= v0
-	i := some18s
-: updateProgessDoubleGain
-	sprite v2 v3 1
-;
-
-: updateHealth
-	v0 := 0x3
-	v0 &= v1
-	if v0 != 0 then return
-: forceHealthUpdate
-	v1 >>= v1
-	v1 >>= v1
-	i := avalue01
-	v2 += 4
-	v2 -= v1
-
-	sprite v2 v3 1
-
+: add_suck
+	if suckvalue == 16 then return
+	suckvalue += 1
+	v1 := -8
+	v2 := suckvalue
+	vf := BarBottomFill
+	v2 =- vf
+	i := barfill
+	sprite v1 v2 1
 ;
 
 : writeGameValues
@@ -470,8 +430,8 @@
 			load v3
 			end
 
-		v0 := random 0x07
-		v1 := 32
+		v0 := 0
+		v1 := 0
 		save v3
 		i += v4
 		vf += 2
@@ -504,7 +464,7 @@
 	StepTimer := intro_timer
 	fill_step_display
 	loop
-		vf := 4
+		vf := 8
 		delay := vf
 
 		decrease_step_display
@@ -851,9 +811,7 @@
 	i += killbox
 	load v3
 
-	# If the bit we shifted off of ve was 1 then we return here:
-	if fightLoopValue != 0 then return
-
+: draw_antagonist_data_prefilled
 	i := antagonist_sprite_data
 	i += killbox_character
 	
