@@ -74,6 +74,9 @@
 :alias fightLoopValue v8
 :alias cleanupcalculator v7
 :alias suckvalue v6
+:alias kills v5
+
+:alias corridorAlternate v4
 
 :const intro_text_x 0x1
 :const intro_upper_text_y 0x11
@@ -82,9 +85,9 @@
 
 :const buzzer_gun_flash 5
 
-:const BarBottomFill 0x3e
-:const intro_timer 16
-:const step_bar_capacity 16
+:const BarBottomFill 0x40
+:const intro_timer 14
+:const step_bar_capacity 14
 
 :const boxX_long_minus_2 0x20
 :const boxX_long_middle 0x38
@@ -97,6 +100,12 @@
 :const some18s 0x05d
 
 :const enemyDataArea 0x1b0
+
+:const trooper_value 0x01
+:const katanaman_value 0x21
+:const body_value 0x41
+:const character_to_hit_displacement 0x80
+:const handgun_man_hit 0x61
 
 #:org 0x1b0
 #: enemyDataArea
@@ -121,6 +130,8 @@
 	#:breakpoint testrewrite
 	writeGameValues
 
+	set_normal_loops
+
 : restartGame
 	lores
 
@@ -141,8 +152,6 @@
 	hires
 	clear
 
-	jump gameTestJump
-
 	# Initialise new paragraph location for introduction:
 	v0 := 0
 	v1 := intro_text_x
@@ -161,12 +170,13 @@
 	save v1
 
 	# Restore text introduction start point:
-	#:unpack 0xA intro_text
-	:unpack 0xA intro_text_skip
+	:unpack 0xA intro_text
+	#:unpack 0xA intro_text_skip
 	i := textReadAddress
 	save v1
 
-	jump game_loop
+	#jump game_loop
+	jump gameTestJump
 
  : intro_end
 
@@ -187,7 +197,7 @@
 
 	fightLoopValue := 0
 	killbox := 0
-	killbox_character := 0x60 # Address corpse
+	killbox_character := body_value # Address corpse
 	loop
 		draw_antagonist
 		killbox += 4
@@ -250,33 +260,22 @@
 	TextKing_Y_Override := intro_upper_text_y
 	:unpack 0xA text_yourdog
 	textKing_fullPackage
-	#:breakpoint C
-	vf := 0xf1
-	TextKing_X_Override := intro_text_x
-	TextKing_Y_Override := intro_lower_text_y
-	:unpack 0xA text_killthem
-	textKing_fullPackage
-	#:breakpoint D
-	TextDancerX := 1
-	:unpack 0xA text_killthem
-	danceTextLoop
 
-	: gameTestJump
+	drawkillthem
+
 	clear
-	i := stepEndInsert
-	:unpack 0x1 realGameEndRoundLoop
-	save v1
+
+	set_normal_loops
+	
 
 	# We need to like make a game lol
 	# Set progress values:
 	writeGameValues
 
 	# Draw cops:
-
-	#:breakpoint testGame
-
+	kills := 32
 	killbox := 0
-	killbox_character := 0x20 # Address trooper
+	killbox_character := trooper_value # Address trooper
 	loop
 		fightLoopValue := 0
 		fightLoop
@@ -288,26 +287,168 @@
 	killbox := 0
 	game_loop
 
-	jump restartGame
+	turn_off_dance
+
+	:unpack 0xA text_takeaction
+	textKing_fullPackage
+	:unpack 0xA text_savemen
+	cutsceneWait5
+	clear
+
+	:unpack 0xA text_seemsmaybethey
+	cutsceneWait5
+
+	:unpack 0xA text_copswant
+	textKing_fullPackage
+
+	vf := 0xf1
+	TextKing_X_Override := 0x55
+	TextKing_Y_Override := intro_upper_text_y
+	:unpack 0xA text_yourmen
+	textKing_fullPackage
+
+	drawkillthem
+
+	turn_off_dance
+
+	kills := 48
+	killbox := 0
+	killbox_character := trooper_value # Address trooper
+	loop
+		# This will bring the cops in close like in the movie:
+		fightLoopValue := 20
+		fightLoop
+		fightLoopValue := 0
+		fightLoop
+		killbox += 4
+		if killbox != 0x20 then
+	again
+
+	game_loop
+
+	clear
+
+	v0 := 0x6A
+	i := text_killthemall_mod
+	save v0
+
+	:unpack 0xA text_trademen
+	cutsceneWait5
+
+	:unpack 0xA text_theyknow
+	textKing_fullPackage
+	drawkillthem
+
+	turn_off_dance
+
+	i := stepEndInsert
+	:unpack 0x1 corridorEndLoop
+	save v1
+	
+	:unpack 0x2 corridor_fightLoop
+	i := stepLoopInsert
+	save v1
+
+	# we need to restore the regular positions
+	fightLoopValue := 0xfe
+	writeGameValues
+
+	corridorAlternate := 0
+
+	kills := 48
+
+	game_loop_skip_bars
+
+	: gameTestJump
+	clear
+	set_normal_loops
+
+	:unpack 0xA text_katanamen
+	cutsceneWait5
+
+	kills := 8
+	killbox := 0
+	killbox_character := katanaman_value
+	loop
+		# This will bring the cops in close like in the movie:
+		fightLoopValue := 20
+		fightLoop
+		fightLoopValue := 77
+		fightLoop
+		killbox += 4
+		if killbox != 0x20 then
+	again
+
+	game_loop
+
+	clear
+	:unpack 0xA text_takeaction
+	textKing_fullPackage
+	:unpack 0xA text_killfather
+	cutsceneWait5
+	clear
+
+	#jump restartGame
+	jump main
+
+
+: corridorEndLoop
+
+	# Remove preston:
+	address_preston	
+	scroll-left
+	scroll-left
+	# redraw preston
+	address_preston
+
+	killbox_character := trooper_value
+	v2 := 0x70
+
+	v3 := corridorAlternate
+	vf := 0x30
+	corridorAlternate ^= vf
+	draw_antagonist_data_prefilled
+
+	if kills == 0 then return
 
 	jump stepEndInsertReturn
+
+: corridor_fightLoop
+	if vf == 0x55 begin
+		fightLoopValue := 40
+		i := inputzones
+		shootEnemy
+		
+		#fightLoopValue := 1
+		end
+
+	# If the player pushed a button this turn:
+	decrease_step_display
+	decrease_step_display
+	if StepTimer != 0 then decrease_step_display
+	if StepTimer != 0 then decrease_step_display
+;
 
 : realGameEndRoundLoop
 
 	# We will iterate over all targets, count any we should have shot that we should have shot
 	killbox := 0
+	if kills == 0 then StepTimer := 0
 	# 6 is: Score stuff
 	loop
 		fightLoopValue := 6
 		fightLoop
 
-		killbox_character := 0x20
+		killbox_character := trooper_value
 		fightLoopValue := 0
-		fightLoop
+		if kills != 0 then fightLoop
 
 		killbox += 0x4
 		if killbox != 0x20 then
 	again
+
+	# if our kills has wrapped around then we're done
+	if StepTimer == 0 then return
 
 	jump stepEndInsertReturn
 
@@ -352,6 +493,7 @@
 
 	if fightLoopValue == 6 begin
 		if v1 == 0 then return
+		StepTimer += 1
 		cleanupcalculator := v1
 		v1 := 0
 		save v1
@@ -360,25 +502,27 @@
 		draw_antagonist_data_prefilled
 
 		# If it was a hit enemiy, draw a corpse somewhere
-		if cleanupcalculator > 0x60 begin
-			killbox_character := 0x60
+		if cleanupcalculator > body_value begin
+			if kills != 0 then kills += -1
+			killbox_character := body_value
 			v2 := random 0x3F
 			v2 += -39
 			v3 := random 0x1F
 			draw_antagonist_data_prefilled
 			end
 		
-		if cleanupcalculator < 0x60 then add_suck
+		if cleanupcalculator < body_value then add_suck
 
 		end
 
 
-
+	if fightLoopValue == 77 then jump force_spawn
 	# This is creating an enemy:
 	if fightLoopValue == 0 begin
 		if v1 != 0 then return
 		vf := random 0x01
-		if vf == 0 then v1 := killbox_character
+		if vf == 0 then 
+			: force_spawn v1 := killbox_character
 		if v1 == 0 then return
 		save v1
  		draw_antagonist_data_prefilled
@@ -390,18 +534,51 @@
 		if v1 == 0 then return
 		if v1 > 0x40 then return
 		killbox_character := v1
-		v1 += 0x80
+		v1 += character_to_hit_displacement
 		save v1
 		draw_antagonist_data_prefilled
 		killbox_character := v1
 		draw_antagonist_data_prefilled
 
 		end
+
+	if fightLoopValue == 20 begin
+		v2 >>= v2
+		v2 += 0x1c
+		v3 >>= v3
+		v3 += 0xc
+		save v3
+		end
+
+	if fightLoopValue == 40 begin
+		v2 += 4
+		v3 += 4
+		i := anFF
+		sprite v2 v3 1
+
+		if vf != 0 begin
+			sprite v2 v3 1
+			v2 += -4
+			v3 += -4
+			killbox_character := trooper_value
+			draw_antagonist_data_prefilled
+			killbox_character := body_value
+			draw_antagonist_data_prefilled
+			if kills != 0 then kills += -1
+			else
+			sprite v2 v3 1
+			end
+
+
+		
+
+
+		end
 	: skipProgressDraw
 ;
 
 : add_suck
-	if suckvalue == 16 then return
+	if suckvalue == step_bar_capacity then return
 	suckvalue += 1
 	v1 := -8
 	v2 := suckvalue
@@ -439,6 +616,16 @@
 	again
 ;
 
+: set_normal_loops
+	i := stepEndInsert
+	:unpack 0x1 realGameEndRoundLoop
+	save v1
+
+	:unpack 0x2 allboxes_fightloop
+	i := stepLoopInsert
+	save v1
+;
+
 : cutsceneWait5
 	# Write text based on v0 / v1 values being the address
 	textKing_fullPackage
@@ -450,6 +637,7 @@
 ;
 
 : game_loop
+	suckvalue := 0
 	draw_bars
 : game_loop_skip_bars
 	# Set initial player position:
@@ -458,7 +646,6 @@
 
 	# Create a preston:
 	address_preston
-	sprite playerX playerY 0
 : game_loop_skip_preston
 	# Draw the display bars:
 	StepTimer := intro_timer
@@ -477,13 +664,14 @@
 		if StepTimer == 0 begin
 			StepTimer := buzzer_gun_flash
 			buzzer := StepTimer
-			StepTimer := intro_timer
-			fill_step_display
 
 			: stepEndInsert
 			0 0
 
 			: stepEndInsertReturn
+
+			:next stepresetvalue StepTimer := intro_timer
+			fill_step_display
 			end
 		
 		loop
@@ -548,7 +736,7 @@
 	v3 += 1
 
 	textKing_useSavedParagraph
-	if v0 == 0xfd then jump intro_end
+	if v0 == 0xfd then return
 	
 	if v3 == 2 then jump introTextRedrawEnd
 
@@ -655,12 +843,9 @@
 
 	# remove existing:
 	address_preston
-	sprite playerX playerY 0
 
 	# caluclate new value:
 	calc_preston
-	address_preston
-	sprite playerX playerY 0
 
 	vf := 0x55
 ;
@@ -684,14 +869,12 @@
 	playerY := 0x18
 
 	address_preston
-	sprite playerX playerY 0
 
 	:unpack 0xA preston_idle
 	i := address_preston
 	save v1
 
 	address_preston
-	sprite playerX playerY 0
 
 	i := lastinput_less_2
 	v1 := 5
@@ -699,10 +882,6 @@
 ;
 
 
-
-: address_preston
-	i := preston_idle
-;
 
 : calc_preston
 	# uses: v0, v1, v2, v3, vf
@@ -734,55 +913,36 @@
 
 	i := address_preston 	# added by self mod
 	save v1 			# added by self mod
+: address_preston
+	i := preston_idle
+	sprite playerX playerY 0
 ;
 
 ## Draw Bars - draws the UI bars onto the screen
 : draw_bars
-	i := barbottom
-	v0 := 0
-	v1 := 0x38
-	sprite v0 v1 8
-	v0 := 0x78
-	sprite v0 v1 8
-
-	i := bartop
-	v1 := 0x28
-	sprite v0 v1 8
-	v0 := 0
-	sprite v0 v1 8
-
 	i := barbody
-	loop
-		v1 += 0x08
-		sprite v0 v1 8
-		if v1 != 0x30 then
-	again
-
-	v1 := 0x28
+	v0 := 0
+	v1 := 0x31
+	sprite v0 v1 0xf
 	v0 := 0x78
-	loop
-		v1 += 0x08
-		sprite v0 v1 8
-		if v1 != 0x30 then
-	again
+	sprite v0 v1 0xf
 ;
 
 : fill_step_display
 	v0 := step_bar_capacity
 
-	v1 := 0x00
+	v1 := 0
 	v2 := BarBottomFill
 	i := barfill
 	loop
-		v0 += -8
-		v2 += -8
-		sprite v1 v2 8
+		v0 += -7
+		v2 += -7
+		sprite v1 v2 7
 		if v0 != 0 then
 	again
 ;
 
 : decrease_step_display
-
 	v1 := 0
 	v2 := StepTimer
 	vf := BarBottomFill
@@ -800,7 +960,7 @@
 	# input region (1 2 3  4 5 6  7 8 9)
 	# We want to position the target wherever they were aiming for this, so we must have preloaded v0 and in this case, v1 with valid data
 	if v1 == 5 then return
-	killbox_character := 0x80 # hit handgun man
+	killbox_character := handgun_man_hit # hit handgun man
 	killbox := v0
 	killbox <<= killbox
 	killbox <<= killbox
@@ -825,21 +985,20 @@
 : lastinput
 	0x05 0x07
 
-: barbottom
-	0x5a 0x42 0x42 0x42 0x42 0x42 0x7E 0x00 
 : barbody
-	0x5a 0x42 0x42 0x42 0x42 0x42 0x42 0x42 
-: bartop
-	0x00 0x00 0x00 0x00 0x00 0x7E 0x42 0x42 
+	0x7E 0x42 0x42 0x5A 0x42 0x5A 0x42 0x5A 
+	0x42 0x5A 0x42 0x5A 0x42 0x5A 0x42 
 : barfill
-	0x3C 0x3C 0x3C 0x3C 0x3C 0x3C 0x3C 0x3C
-
+	0x3C 0x3C 0x3C 0x3C 0x3C 0x3C 
 : antagonist_sprite_data
-: handgun_person
-0x00 0x00 0x00 0x00 0x00 0x00 0x03 0xC0 
-0x03 0xC0 0x03 0xC0 0x01 0x80 0x03 0xC0 
-0x03 0xFC 0x03 0xF0 0x01 0xE0 0x01 0x80 
-0x03 0xC0 0x06 0x60 0x06 0x60 0x0E 0x70 
+						0x3C
+
+
+#: handgun_person
+#0x00 0x00 0x00 0x00 0x00 0x00 0x03 0xC0 
+#0x03 0xC0 0x03 0xC0 0x01 0x80 0x03 0xC0 
+#0x03 0xFC 0x03 0xF0 0x01 0xE0 0x01 0x80 
+#0x03 0xC0 0x06 0x60 0x06 0x60 0x0E 0x70 
 
 : trooper
 0x00 0x00 0x00 0x00 0x03 0xC0 0x03 0xC0 
@@ -1139,6 +1298,19 @@
 	save v1
 ;
 
+: drawkillthem
+	#:breakpoint C
+	vf := 0xf1
+	TextKing_X_Override := intro_text_x
+	TextKing_Y_Override := intro_lower_text_y
+	:unpack 0xA text_killthem
+	textKing_fullPackage
+	#:breakpoint D
+	TextDancerX := 1
+	:unpack 0xA text_killthem
+	danceTextLoop
+;
+
 : title_text
 	0x2C 0x31 0x0C 0x2C 0x46 0x39 0x35 0x6F
 	0x0C 
@@ -1216,7 +1388,7 @@
 	0x76 0x7D 0x39 0x10 0x6A 0x6F 0x90 0x6A
 	0x04 0x31 0x39 0x13 0x04 0x0C 0x6A 0x90
 	0x35 0x04 0x31 0xFF 
-
+	0xFF
 	# Master of gun kata
 	0xE4 0x39 0x10 0x31 0x6A
 	0x18 0x7D 0x2C 0x39 0x31 0x04 0x6A 0x6F
@@ -1297,7 +1469,7 @@
 : text_yourmen
 	0x39 0x10 0x31 0x6A
 	#0x65 0x6F 0x13 0x04 0x6A # your is too long :(
-	0x00 0x6F 0x24 0xFF
+	0x18 0x31 0x0C 0xFF
 
 : text_killthem
 	0x08 0x35 0x93 0x93 0x6A 0x39 0x10 0x31
@@ -1307,6 +1479,7 @@
 	0x7D 0x93 0x93 0xFF
 
 : text_savemen
+	0xFE
 	0x65 0x6F 0x13 0x6A 0x2C 0x7D 0x1B 0x31
 	0x6A 0x2C 0x6F 0x18 0x31 0x6A 0x18 0x31
 	0x0C 0xFF
@@ -1314,7 +1487,7 @@
 : text_seemsmaybethey
 	0x35 0x39 0x6A 0x2C 0x31 0x31 0x18 0x2C
 	0x6A 0x18 0x7D 0x65 0x74 0x31 0x6A 0x39
-	0x10 0x31 0x65 0xFF
+	0x10 0x31 0x65 0xFE
 : text_likeyou
 	0x93 0x35 0x08 0x31
 	0x6A 0x65 0x6F 0x13 0xFF
@@ -1335,14 +1508,14 @@
 : text_katanamen
 	0x6F 0x10 0x6A 0x2C 0x10 0x35 0x39 0x57
 	0x6A 0x08 0x7D 0x39 0x7D 0x0C 0x7D 0x6A
-	0x18 0x31 0x0C 0x57 0xFF
+	0x18 0x31 0x0C 0x57 0xFE
 : text_toobad
 	0x39 0x6F 0x6F 0x6A 0x74 0x7D 0x00 0x6A
 	0x65 0x6F 0x13 0x6A 0x10 0x7D 0x1B 0x31
 	0x6A 0x24 0x13 0x0C 0x2C 0xFF
 
 : text_killfather
-	0x08 0x35 0x93 0x93 0x6A 0x90 0x7D 0x39
+	0xFE 0x08 0x35 0x93 0x93 0x6A 0x90 0x7D 0x39
 	0x10 0x31 0x04 0xFF
 
 
