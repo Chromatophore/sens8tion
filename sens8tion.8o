@@ -181,12 +181,12 @@
 	# At this point, we wil have preston on the screen in a pose, we want to move him to be idle:
 
 	# Remove the existing hit bodies:
-	i := inputzones
-	load v1
-	draw_antagonist_tutorial
-	i := lastinput_less_2
-	load v1
-	draw_antagonist_tutorial
+	#i := inputzones
+	#load v1
+	#draw_antagonist_tutorial
+	#i := lastinput_less_2
+	#load v1
+	#draw_antagonist_tutorial
 
 	# Set perston idle:
 	go_idle
@@ -206,7 +206,6 @@
 
 	TextDancerX := 43
 	:unpack 0xA end_intro_lightly
-	:breakpoint dangit
 	danceTextLoop
 
 	:unpack 0xA	text_future
@@ -758,6 +757,11 @@
 ;
 
 : introductionSequence
+
+	kills := 0 # Pass number
+	
+	# we need to remove any old text first
+	: introTextRedrawLoop
 	# In the tutorial, we want to draw a hit guy wherever the player is aiming
 	i := inputzones
 	load v1
@@ -766,16 +770,12 @@
 	load v1
 	draw_antagonist_tutorial
 
-	# we need to remove any old text first
-	v3 := 0 # Pass number
-
-	: introTextRedrawLoop
-	v3 += 1
+	kills += 1
 
 	textKing_useSavedParagraph
 	if v0 == 0xfd then return
 	
-	if v3 == 2 then jump introTextRedrawEnd
+	if kills == 2 then jump introTextRedrawEnd
 
 	# Increase text pointer to next section:
 	i := textReadAddress
@@ -787,16 +787,9 @@
 	#i := textReadAddress
 	save v1
 
-	if v3 == 1 then jump introTextRedrawLoop
+	if kills == 1 then jump introTextRedrawLoop
 
 	: introTextRedrawEnd
-
-	i := inputzones
-	load v1
-	draw_antagonist_tutorial
-	i := lastinput_less_2
-	load v1
-	draw_antagonist_tutorial
 
 	jump stepEndInsertReturn
 
