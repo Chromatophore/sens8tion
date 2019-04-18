@@ -7,12 +7,13 @@ This is a video game implimentation of the popular? action schlock movie Equilib
 ## Controls
 
 ![alt text](guidance.png "Sens8tion Controls")
+
 Generally you'll need to use W to progress in cutscenes.
 
 The other Input buttons are:
-1 2 3 
-Q W E 
-A S D 
+1 2 3  
+Q W E  
+A S D  
 
 Basic Goal or Something
 You play a Tetragrammaton Cleric, doing what you do best and ignoring most of the other parts of the movie.
